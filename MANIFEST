@@ -1,0 +1,16 @@
+t/02.t
+t/testlib.pl
+t/dames.db
+t/00_generate_dbdata.pl
+t/01_oo.t
+t/03_Analizer.t
+t/09_search.t
+MANIFEST
+Makefile.PL
+lib/Metadata/DB/Analizer.pm
+lib/Metadata/DB/Search.pm
+lib/Metadata/DB/Search/InterfaceHTML.pm
+lib/Metadata/DB/Base.pm
+lib/Metadata/DB.pm
+
+META.yml                                 Module meta-data (added by MakeMaker)

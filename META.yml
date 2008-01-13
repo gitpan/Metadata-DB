@@ -1,0 +1,17 @@
+# http://module-build.sourceforge.net/META-spec.html
+#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
+name:         Metadata-DB
+version:      1.06
+version_from: lib/Metadata/DB.pm
+installdirs:  site
+requires:
+    HTML::Template:                0
+    HTML::Template::Default:       0
+    LEOCHARRE::Class:              0
+    LEOCHARRE::Class::Accessors:   1.12
+    LEOCHARRE::Database:           1
+    LEOCHARRE::DEBUG:              
+    Metadata::Base:                0
+
+distribution_type: module
+generated_by: ExtUtils::MakeMaker version 6.30
