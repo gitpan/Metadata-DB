@@ -33,6 +33,9 @@ cup => 'A',
 });
 
 
+my $hits = $s->ids_count;
+ok($hits, "got $hits");
+
 my $got =0;
 for my $id (@{$s->ids}){
    #my $m = get_one($id);
@@ -48,12 +51,11 @@ for my $id (@{$s->ids}){
 
 my $idco = $s->ids_count;
 
-ok($got == $s->ids_count, "got[$got] and id[$idco] count match");
+ok($got == $s->ids_count, "got[$got] and id[$idco] count match") or die;
 
 my $cks;
 ok( $cks = $s->constriction_keys,'got constriction keys') or die;
 print STDERR "   # constriction keys : @$cks\n";
-
 
 
 # ---- search 
@@ -81,6 +83,28 @@ my $meta = $m->get_all;
 ok( scalar keys %$meta,"get_all returns after load");
 ### $meta
 
+
+
+
+
+# ONE MORE SEARCH...
+#
+
+# ---- search 
+
+$s->search({
+   age => [16,15,17],
+   hair => ['blonde','redhead'],
+   eyes => 'green',
+});
+
+for my $id (@{$s->ids}){
+   my $m = Metadata::DB->new({ DBH => $dbh, id => $id });
+   ok( $m->load, "got ".$m->get('name') );
+   my $hair = $m->get('hair');
+   my $age = $m->get('age');
+   print STDERR " age $age, hair $hair\n"; 
+}
 
 
 

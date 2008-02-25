@@ -5,12 +5,14 @@ t/00_generate_dbdata.pl
 t/01_oo.t
 t/03_Analizer.t
 t/09_search.t
+t/10_search_more.t
+t/99_cleanup_after_tests.pl
 MANIFEST
 Makefile.PL
-lib/Metadata/DB/Analizer.pm
-lib/Metadata/DB/Search.pm
-lib/Metadata/DB/Search/InterfaceHTML.pm
-lib/Metadata/DB/Base.pm
+lib/Metadata/DB/Analizer.pm - analize the database content
+lib/Metadata/DB/Search.pm - search the database
+lib/Metadata/DB/Search/InterfaceHTML.pm - generate static html form 
+lib/Metadata/DB/Base.pm - store metadata record in db base
 lib/Metadata/DB.pm
 
 META.yml                                 Module meta-data (added by MakeMaker)

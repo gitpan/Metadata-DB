@@ -73,6 +73,9 @@ for my $att (@$cratios){
 
    my $options = $a->attribute_option_list($att) or next;
    print STDERR " $att : @$options\n";  
+   
+   my $is_number = $a->attribute_type_is_number($att);
+   print STDERR " -- att $att is number? $is_number\n";
 
 }
 

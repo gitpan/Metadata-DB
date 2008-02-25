@@ -82,6 +82,32 @@ sub _sort {
 }
 
 
+#just for heuristics!!! not accurate!
+sub _att_uniq_vals {
+   my ($self,$att) = @_;
+   defined $att or croak('missing att');
+
+   my $limit = 1000;
+
+   # unique vals
+   my $s = $self->dbh->prepare_cached(
+      sprintf "SELECT DISTINCT %s FROM %s WHERE %s=? LIMIT ?", # this is for heuristics
+      $self->table_metadata_column_name_value,
+      $self->table_metadata_name,
+      $self->table_metadata_column_name_key
+      );
+   
+   $s->execute($att,$limit);
+   
+   my $value;
+   $s->bind_columns(\$value);
+
+   my @vals;
+   while($s->fetch){
+      push @vals,$value;
+   }
+   return \@vals;
+}
 
 
 
@@ -100,6 +126,8 @@ sub attribute_all_unique_values {
 
    debug("limit = $limit\n") if $limit;
    
+   
+
    # unique vals
    my $q = sprintf "SELECT DISTINCT %s FROM %s WHERE %s='%s' $_limit",
    
@@ -138,6 +166,17 @@ sub attribute_all_unique_values_count { # THIS WILL BE SLOW
 
 }
 
+sub attribute_type_is_number {
+   my ($self,$att) = @_;
+   defined $att or croak('missing attribute name');
+
+   my $vals = $self->_att_uniq_vals($att) or return;
+   scalar @$vals or return;
+   for (@$vals){
+      /^\d+$/ or return 0;      
+   }
+   return 1;
+}
 
 
 # multi
@@ -362,7 +401,13 @@ returns array ref.
 if you provide the limit, and it is reached (more then 'limit' unique value occurrences) then it returns undef.
 
 
+=head2 attribute_type_is_number()
 
+argument is the attribute name
+analizes the possible values and determines if they are all numbers
+returns boolean
+
+this is useful if you want to offer 'less than' option in a select box, for example
 
 
 

@@ -15,6 +15,13 @@ sub new {
 }
 
 
+sub _select_limit {
+   my($self,$limit) = @_;
+   if(defined $limit){
+      $self->{_select_limit} = $limit;
+   }
+   return $self->{_select_limit};
+}
 
 
 
@@ -85,55 +92,141 @@ sub search { # multiple key lookup and ranked
    
    
 
-   my ($table,$colk,$colv,$coli) = ($self->table_metadata_name, $self->table_metadata_column_name_key, $self->table_metadata_column_name_value, $self->table_metadata_column_name_id);
+   my ($table,$colk,$colv,$coli) = ( 
+      $self->table_metadata_name, 
+      $self->table_metadata_column_name_key, 
+      $self->table_metadata_column_name_value, 
+      $self->table_metadata_column_name_id );
+
+
+   my $_select_limit = $self->_select_limit;
+   if( $_select_limit ){
+      $_select_limit = " LIMIT $_select_limit";
+   }
+   else {
+      $_select_limit ='';
+   }
+
+   debug("[select limit: $_select_limit] $table $colk $colv $coli");
+
+   
+
 	my $select= {
-	 'like'  => $self->dbh->prepare("SELECT $coli FROM $table WHERE $colk=? and $colv LIKE ?"),
-	 'exact' => $self->dbh->prepare("SELECT $coli FROM $table WHERE $colk=? and $colv=?"),
+
+	 'like'  => (
+      $self->dbh->prepare(
+         "SELECT $coli FROM $table WHERE $colk=? and $colv LIKE ? $_select_limit") 
+         or die($DBI::errstr)
+         ),
+
+	 'exact' => (
+      $self->dbh->prepare(
+         "SELECT $coli FROM $table WHERE $colk=? and $colv = ? $_select_limit") 
+         or die($BI::errstr)
+         ),
+
+    'lessthan' => (
+      $self->dbh->prepare(
+         "SELECT $coli FROM $table WHERE $colk=? and $colv < CAST( ? AS SIGNED ) $_select_limit") 
+         or die($DBI::errstr)
+         ),
+
+    'morethan' => (
+      $self->dbh->prepare(
+         "SELECT $coli FROM $table WHERE $colk=? and $colv > CAST( ? AS SIGNED ) $_select_limit") 
+         or die($DBI::errstr)
+         ),
+
+
 	};	
-	my $sk = 'like'; #default
 
 	my $RESULT = {};
+   
 
-	for ( keys %{$arg} ){
-		my ($key,$value)= ($_,undef); 
-		
-		if ($key=~s/:exact$//){ # EXACT, so they can override the like
-			$value = $arg->{$_};
-			$sk= 'exact';
-		}
-		else { # LIKE		
-			$key=~s/:like$//; # just in case
-			$value = "%".$arg->{$_}."%";
-			$sk ='like'			
-		}
-		
-		$select->{$sk}->execute($key,$value) or warn("cannot search? $DBI::errstr");
 
-		while ( my $row = $select->{$sk}->fetch ){
-			$RESULT->{$row->[0]}->{_hit}++;
+   my @search_terms;   
+   # this is to they can search({ key => $array_ref }) as well as regular string
+   SEARCH_TERMS: for ( keys %$arg ){
+      # TODO, should we sanitize the 'values' ?, like take out non alphanum?
+      # because wouldnt %this do a like search??
+
+		my ($key,$_value,$select_type)= ($_,undef,undef); 
+      $_value = $arg->{$key};
+
+      # what select query to use?
+      if( $key=~s/:(\w+)$// ){
+         exists($select->{$1}) or croak("select type $1 does not exist");
+         $select_type = $1;
+      }
+      $select_type ||='like';
+
+      exists $select->{$select_type} or confess("select type $select_type does not exist");
+         
+      my @vals;
+      # are there many values to match or one?
+      if (my $ref = ref $_value){
+         $ref eq 'ARRAY' or croak('can only accept scalar or an array ref');
+         @vals = @$_value;
+      }
+      else {
+         @vals =( $_value );
+      }
+
+      for my $rawval ( @vals ){
+         if ($select_type eq 'like'){
+            push @search_terms, [$key, "\%$rawval\%", $select_type];
+         }
+         else {
+            push @search_terms, [$key, $rawval, $select_type];
+         }
+         debug(" SEARCH TERM: [$select_type, $key, $rawval]");
+      }
+      next SEARCH_TERMS;
+   }
+		
+	
+
+   QUERY: for ( @search_terms ){
+		my ($key,$value,$select_type)= @$_; 
+      defined $key or die("key missing");
+      defined $value or die("value missing");
+      defined $select_type or die('select type missing');
+
+	   debug(" QUERY : $select_type, $key, $value ..");
+      
+      my $id;
+      my $q = $select->{$select_type};
+		$q->execute($key,$value) 
+         or warn("cannot search? $DBI::errstr");
+      debug("executed.\n");
+      
+      $q->bind_columns(\$id);
+   
+		while ( my $row = $q->fetch ){
+			$RESULT->{$id}->{_hit}++;
 		}		
-		
+		next QUERY;
 	}
+
+
 
 	# just leave the result whose count matches num of args?
 	# instead should order them to the back.. ?
 	my $count = 0;
    my $ids = [];
-	for (keys %{$RESULT}){
+	for my $id (keys %{$RESULT}){
    
 		# not full match? take out
-		if( $RESULT->{$_}->{_hit} < $self->search_params_count ){
-			delete $RESULT->{$_};
+		if( $RESULT->{$id}->{_hit} < (scalar @search_terms) ){ 
+         
+			delete $RESULT->{$id};
 			next;			
 		}
       
-		#$RESULT->{$_} = $self->get_all($_);
-      push @$ids, $_;
+      push @$ids, $id;
 		$count++;		
 	}
 	
-	#$self->{_search}->{count} = $count;
-	#$self->{_search}->{data}  = $RESULT;
    debug(sprintf "got %s ids\n",scalar @$ids);
    $self->ids_set($ids);
    $self->ids_count_set( scalar @$ids);
@@ -162,6 +255,7 @@ Metadata::DB::Search - search the indexed metadata
    $s->search({
       age => 24,
       'first_name:like' => 'jo',   
+      'speed:morethan' => 40,
    });
 
    $s->ids_count or die('nothing found');
@@ -179,6 +273,8 @@ Metadata::DB::Search - search the indexed metadata
    $s->search_params_add( age => 24 );
    
    $s->search_params_add( 'first_name:like' =>'jo' );
+
+
    
    $s->search;
 
@@ -199,7 +295,7 @@ What if you want to search other metadata table?
       'first_name:like' => 'jo',   
    });
    
-   for 
+   
 
 =head1 METHODS
 
@@ -214,9 +310,25 @@ returns how many search params we have
 =head2 search()
 
 optional argument is a hash ref with search params
+these are key value pairs
+the value can be a string or an array ref
+
+   $s->search({
+      age => 25,
+      'name:exact' => ['larry','joe']
+   });
+
+Possible search types for each attribute are like, exact, morethan, lessthan, default
+is like.
+
+=head2 _select_limit()
+
+experimental, arg is number, may help speed up searches if set, possible num is 100?
 
 =head1 ids()
 
 returns array ref of matching ids, results, in metadata table that meet the criteria
+
+
 
 =cut

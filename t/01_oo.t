@@ -22,7 +22,7 @@ my $dbh = _get_new_handle();
 
 # Object tests
 
-my $m = new Metadata::DB({ DBH => $dbh , id => 'bogus' });
+my $m = new Metadata::DB({ DBH => $dbh , id => 88 });
 
 ok( $m->table_metadata_check );
 
@@ -48,7 +48,7 @@ ok($m->entries_count == 2, 'entries count is 2');
 ok( $m->id_exists ,'exists 1');
 
 $m->set(height => "5'7\"");
-$m->set(weight => "118#s");
+$m->set(weight => 118);
 
 my $meta_all = $m->get_all;
 ### $meta_all
@@ -76,7 +76,7 @@ undef $m;
 
 my $dbh2 = _get_new_handle();
 
-my $m2 = new Metadata::DB({ DBH => $dbh2 , id => 'bogus' });
+my $m2 = new Metadata::DB({ DBH => $dbh2 , id => 88 });
 ok($m2->load,'loaded');
 my $meta_all2 = $m2->get_all;
 

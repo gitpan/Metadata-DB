@@ -4,8 +4,8 @@ use base 'Metadata::DB::Analizer';
 use LEOCHARRE::Class::Accessors single => ['tmpl'];
 use warnings;
 use Carp;
+use HTML::Entities;
 no warnings 'redefine';
-
 
 
 
@@ -17,11 +17,24 @@ no warnings 'redefine';
 sub cgiapp_search_form_output {
    my ($self,$submit_rm) = @_;
 
-   $submit_rm ||= 'search_results';
+   $submit_rm ||= 'mdw_search_results';
    
-   my $out = q{<form name="search_form" action="?rm=search_results" method="post">};
+   my $out = q{<form name="search_form" action="?rm=mdw_search_results" method="post">};
    $out .=   $self->html_search_form_output;
+  
+
+#   $out .=  q|<p>Max Results:<select name="max_results_show">
+ #     <option>
+  #    <option selected>100</option>
+   #   <option>
+   #|;
+  
    $out .=   qq|<p><input type="submit" value="search"></p><input type="hidden" name="rm" value="$submit_rm"></form>|;
+
+   
+   my $date=`date`;
+   chomp $date;
+   $out.= "<p>Last updated $date</p>";
    
    return $out; 
 }
@@ -74,13 +87,13 @@ sub _html_tmpl_code_default {
   </TMPL_LOOP>
   </select>
   
-  <input type="hidden" name="<TMPL_VAR ATTRIBUTE_NAME>_match_type_exact>" value="1">
+  <input type="hidden" name="<TMPL_VAR ATTRIBUTE_NAME>_match_type_exact" value="1">
   
     
  <TMPL_ELSE>
 
    <input type="text" name="<TMPL_VAR ATTRIBUTE_NAME>">
-   <input type="checkbox" name="<TMPL_VAR ATTRIBUTE_NAME>_match_type_exact>"> exact
+   <input type="checkbox" name="<TMPL_VAR ATTRIBUTE_NAME>_match_type_exact"> exact
   
  </TMPL_IF>
 
@@ -134,6 +147,7 @@ sub generate_hidden_vars {
 
 
 # make hashref for one search attribute
+# TODO, add that if we have only nums, we can select 'more than' etc
 sub generate_search_attribute_params {
    my($self,$att,$limit) = @_;
 
@@ -152,7 +166,8 @@ sub generate_search_attribute_params {
          # first should be blank
          my @opts_loop = ({ option_name => '----', option_value => '' });
                   
-         map { push @opts_loop, { option_name => $_, option_value => $_ } } @$opts;
+
+         map { push @opts_loop, { option_name => $_, option_value => encode_entities($_) } } @$opts;
       
          $param = {         
             attribute_name => $att,

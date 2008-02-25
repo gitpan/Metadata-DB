@@ -11,6 +11,7 @@ sub _get_new_handle {
 
    my $dbh = DBI::connect_sqlite($abs);
    $dbh or die('cant open db connection, still open?');
+   print STDERR "\n\n ++ OPENED SQLITE $abs\n\n";
    return $dbh;
 
 
@@ -115,7 +116,7 @@ sub _gen_people_metadata {
          $ran=1;
       }
 
-      $m->id_set($id);     
+      $m->id($id);     
       my $att = _gen_random_girl_hash();
    
 
@@ -150,6 +151,8 @@ sub _gen_people_metadata {
    
    $dbh->commit;
    $dbh->disconnect;
+   
+   printf STDERR " SAVED %s\n", _abs_db() ;
    return 1;
    
 }

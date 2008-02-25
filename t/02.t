@@ -25,7 +25,7 @@ for my $name ( qw(James Larry Barry Mika Laurie Jeanie Larissa Miranda Joseph)){
    my $m = Metadata::DB->new({ DBH => $dbh }); 
    $m->table_metadata_check;
    
-   $m->id_set($id++);
+   $m->id($id++);
    
    my $meta = { 
       name => $name,
@@ -60,7 +60,9 @@ ok($db,"new db handle");
 
 $Metadata::DB::DEBUG = 1;
 
-my $d = Metadata::DB->new({ DBH => $db, id=>3 });
+
+my $_id=3;
+my $d = Metadata::DB->new({ DBH => $db, id=>$_id });
 ok($d->load,'load'); # HAVE TO LOAD
 
 my $entries_count = $d->entries_count;
@@ -79,6 +81,20 @@ ok( $d->get('name') eq 'Barry', 'name meta is Barry');
 
 
 
+
+
+
+## TRY HASH FECHING
+
+my $_meta1 = $d->_record_entries_hashref($_id);
+### $_meta1
+
+
+my $_meta2 = $d->_record_entries_hashref_2($_id);
+### $_meta2
+
+my $_meta3 = $d->_record_entries_hashref_3($_id);
+### $_meta3
 
 
 

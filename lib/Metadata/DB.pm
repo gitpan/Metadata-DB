@@ -1,12 +1,11 @@
 package Metadata::DB;
 use strict;
-use LEOCHARRE::Class::Accessors single => [qw(id loaded)];
 use LEOCHARRE::DEBUG;
 use base 'Metadata::Base';
 use base 'Metadata::DB::Base';
 use Carp;
 use vars qw($VERSION);
-$VERSION = sprintf "%d.%02d", q$Revision: 1.6 $ =~ /(\d+)/g;
+$VERSION = sprintf "%d.%02d", q$Revision: 1.9 $ =~ /(\d+)/g;
 no warnings 'redefine';
 
 
@@ -20,14 +19,20 @@ sub new {
 
 sub id {
    my $self = shift;
-   unless( $self->id_get){
-      debug('setting id via constructor..');
-      $self->{id} or return;
-      $self->id_set($self->{id});
-   }
-   return $self->id_get;
+   my $val = shift;
+   if(defined $val){
+      $self->{id} = $val;
+   }   
+   return $self->{id};
 }
 
+sub loaded {
+   my($self,$val) =@_;
+   if (defined $val){
+      $self->{loaded} = $val;
+   }
+   return $self->{loaded};
+}
 
 # overriding  Metadata::Base::Write
 *write = \&save;
@@ -93,7 +98,7 @@ sub load {
    $self->id or confess('cannot load, no id is set, no id was passed as arg');
    #debug('calling clear..');
    #$self->clear;
-   $self->loaded_set(1);
+   $self->loaded(1);
 
    if ( my $meta= $self->_record_entries_hashref($self->id) ){
       debug("found meta for:".$self->id);
@@ -111,6 +116,7 @@ sub add {
       defined $key and defined $val or confess('undefined values');
       #debug("adding $key:$val\n");
       # TODO , what if $val is an array ref?? then... is set just recording ONE ????
+      # Metadata::Base says if the value is array ref, then all vals are recorded
       $self->set($key, $val);
    }
    return 1;
@@ -154,7 +160,7 @@ Metadata::DB
    $o->load;
    $o->set( name => 'jack' );
    $o->set( age  =>  14 );
-   $o->id_set(4);
+   $o->id(4);
    $o->save;
 
 
@@ -164,7 +170,7 @@ Metadata::DB
    my $dbh;
 
    my $o = new Metadata::DB($dbh);
-   $o->id_set(4);
+   $o->id(4);
    $o->load;
    $o->get( 'name' );
    $o->set( 'age' );
@@ -187,13 +193,13 @@ If you pass the id to the constructor, it will attempt to load from db.
 You can directly tell it what the id will be , and then request to load.
 
    my $o = new Metadata::DB({ DBH => $dbh });
-   $o->id_set('james');
+   $o->id('james');
    $o->load;
 
 =item checking for record
 
    my $o = new Metadata::DB({ DBH => $dbh });
-   $o->id_set('james');
+   $o->id('james');
    $o->load; # you must call load
    $o->id_exists;
 
@@ -209,13 +215,10 @@ argument is hash ref with at least a DBH argument, which is a database handle.
 
 Optional argument is 'id'.
 
-=head2 id_set()
+=head2 id()
 
-set the id
-
-=head2 id() and id_get()
-
-get the id
+perl setget method
+arg is number
 
 =head2 id_exists()
 
@@ -306,16 +309,3 @@ Metadata::Base
 Leo Charre
 
 =cut
-~
-~
-~
-~
-
-
-
-
-
-
-
-
-

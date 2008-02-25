@@ -1,27 +1,34 @@
 package Metadata::DB::Base;
 use strict;
-use LEOCHARRE::Class::Accessors single => [qw(
-table_metadata_name
-table_metadata_column_name_id
-table_metadata_column_name_key 
-table_metadata_column_name_value
-dbh
-)];
+#use LEOCHARRE::Class::Accessors single => [qw(
+#table_metadata_name
+#table_metadata_column_name_id
+#table_metadata_column_name_key 
+#table_metadata_column_name_value
+#dbh
+#)];
 use LEOCHARRE::DEBUG;
 use LEOCHARRE::DBI;
 use warnings;
 use Carp;
 
+sub new {
+   my($class,$self) = @_;
+   $self||={};
+   bless $self,$class;
+   return $self;
+}
+
+
 no warnings 'redefine';
+
+
 
 
 sub dbh {
    my $self = shift;
-   unless( $self->dbh_get ){
-      $self->{DBH} or confess('DBH argument must be provided to constructor.');  
-      $self->dbh_set($self->{DBH});
-   }
-   return $self->dbh_get;
+   $self->{DBH} or confess('DBH argument must be provided to constructor.');  
+   return $self->{DBH};
 }
 
 
@@ -29,34 +36,25 @@ sub dbh {
 
 sub table_metadata_name {
    my $self = shift;
-   unless( $self->table_metadata_name_get ){
-      $self->table_metadata_name_set('metadata');
-   }
-   return $self->table_metadata_name_get;
+   $self->{table_metadata_name} ||= 'metadata';
 }
 
 sub table_metadata_column_name_id {
    my $self = shift;
-   unless( $self->table_metadata_column_name_id_get ){
-      $self->table_metadata_column_name_id_set('id');
-   }
-   return $self->table_metadata_column_name_id_get;
+   $self->{table_metadata_column_name_id} ||= 'id';
+   return $self->{table_metadata_column_name_id};
 }
 
 sub table_metadata_column_name_key {
    my $self = shift;
-   unless( $self->table_metadata_column_name_key_get ){
-      $self->table_metadata_column_name_key_set('mkey');
-   }
-   return $self->table_metadata_column_name_key_get;
+   $self->{table_metadata_column_name_key} ||= 'mkey';
+   return $self->{table_metadata_column_name_key};
 }
 
 sub table_metadata_column_name_value {
    my $self = shift;
-   unless( $self->table_metadata_column_name_value_get ){
-      $self->table_metadata_column_name_value_set('mval');
-   }
-   return $self->table_metadata_column_name_value_get;
+   $self->{table_metadata_column_name_value} ||= 'mval';
+   return $self->{table_metadata_column_name_value};
 }
 
 # setup
@@ -80,7 +78,8 @@ sub table_metadata_layout {
    my $current = 
       sprintf
      "CREATE TABLE %s (\n"
-     ."  %s varchar(16),\n"
+    # ."  %s varchar(16),\n" # INSTEAD OF CHAR, USE INT, should be quicker
+     ."  %s int,"
      ."  %s varchar(32),\n"
      ."  %s varchar(256)\n"       
      .");\n",
@@ -176,36 +175,109 @@ sub _record_entries_delete {
    return 1;
 }
 
-sub _record_entries_hashref {
+
+*{_record_entries_hashref} = \&_record_entries_hashref_3; # THIS IS THE BEST ONE
+
+
+# TODO this needs to be redone to be faster.. somehow
+sub _record_entries_hashref_1 {
    my($self,$id)=@_;
    defined $id or croak('missing id');
    
    my $meta={};
 
-   $self->{_selectall_id} ||=
-       $self->dbh->prepare(
-         sprintf
-         "SELECT %s,%s FROM %s WHERE %s = ?",
-         $self->table_metadata_column_name_key,
-         $self->table_metadata_column_name_value,
-         $self->table_metadata_name,
-         $self->table_metadata_column_name_id,
+   
+   unless( $self->{_selectall_id} ){
+      my $attribute_return_limit = 100;      
+      
+      my $prepped = $self->dbh->prepare(
+         sprintf 'SELECT %s,%s FROM %s WHERE %s = ? LIMIT %s',
+         $self->table_metadata_column_name_key, $self->table_metadata_column_name_value,
+         $self->table_metadata_name, $self->table_metadata_column_name_id, $attribute_return_limit
       );
-
+      $self->{_selectall_id} = $prepped;
+   }      
+  
    $self->{_selectall_id}->execute($id);
 
-   while( my @row = $self->{_selectall_id}->fetchrow_array ){
-      my($key,$val) = @row;
-      push @{$meta->{$key}}, $val;
+   
+   while ( my @row = $self->{_selectall_id}->fetchrow_array ){
+      push @{ $meta->{$row[0]} }, $row[1];
    }
    if(DEBUG){
       my @e = keys %$meta;
       debug("got elements[@e]\n");
    }
-   $self->{_selectall_id}->finish;
+   #$self->{_selectall_id}->finish; # maybe this is what's slowing it down
+   # DONT USE finish(), it closes up the statement, means no more will be used of this statement!!!
 
    return $meta;
 }
+
+# attempt at making this faster 2 ..
+sub _record_entries_hashref_2 {
+   my ($self,$id)=@_;
+   defined $id or confess('missing id');   
+   
+   my $meta ={};
+   
+
+      my $sth = $self->dbh->prepare_cached(
+
+         sprintf 'SELECT %s,%s FROM %s WHERE %s = ?',
+         $self->table_metadata_column_name_key, $self->table_metadata_column_name_value,
+         $self->table_metadata_name, $self->table_metadata_column_name_id
+      );
+ 
+   $sth->execute($id);
+
+   
+   my ($key,$val);
+   # USE BIND COLUMNS, SUPPOSEDLY THE MOST EFFICIENT WAY TO FETCH DATA ACCORDING TO DBI.pm
+   $sth->bind_columns(\$key,\$val);
+
+   while( $sth->fetch ){
+      push @{$meta->{$key}},$val;
+   }
+   return $meta;
+}
+
+
+# attempt at making this faster 3 ..
+sub _record_entries_hashref_3 {
+   my ($self,$id)=@_;
+   defined $id or confess('missing id');   
+   
+   my $meta ={};
+   
+   my $_limit = 500; # expect at most how much meta
+   # actually limit is useless unless it is really reached.. :-(
+   
+   $self->{_record_entries_hashref_3} ||=   
+      $self->dbh->prepare_cached(
+         sprintf 'SELECT %s,%s FROM %s WHERE %s = ? LIMIT %s',
+         $self->table_metadata_column_name_key, $self->table_metadata_column_name_value,
+         $self->table_metadata_name, $self->table_metadata_column_name_id,
+         $_limit
+      );
+
+   my $sth = $self->{_record_entries_hashref_3} or die;
+   
+   $sth->execute($id);
+   
+   my $_rows = $sth->fetchall_arrayref;    
+
+   for ( @$_rows ){
+      push @{$meta->{$_->[0]}}, $_->[1];
+   }
+   
+   return $meta;
+}
+
+
+
+
+
 
 sub _table_metadata_insert {
    my($self,$id,$key,$val)=@_;
@@ -214,7 +286,7 @@ sub _table_metadata_insert {
    unless ( $self->{_table_metadata_insert} ){
    
       my $q = sprintf 
-         "INSERT INTO %s (%s,%s,%s) values (?,?,?)",
+         'INSERT INTO %s (%s,%s,%s) values (?,?,?)',
          $self->table_metadata_name,
          $self->table_metadata_column_name_id,
          $self->table_metadata_column_name_key,
@@ -234,8 +306,11 @@ sub _table_metadata_insert {
 sub _table_metadata_insert_multiple {
    my($self,$id,$meta_hashref) = @_;
    ref $meta_hashref eq 'HASH' or croak('missing meta hash ref arg');
-   
-   ATTRIBUTE : for my $att ( keys %$meta_hashref){
+
+   my @atts = keys %$meta_hashref
+      or  croak("there are no key value pairs in the hashref");  
+
+   ATTRIBUTE : for my $att ( @atts ){
       my $_val = $meta_hashref->{$att};
       defined $_val or debug("att $att was not defined\n") and next ATTRIBUTE;
       if ( ref $_val eq 'ARRAY' ){
@@ -259,6 +334,10 @@ sub _table_metadata_insert_multiple {
 
 
 1;
+
+
+__END__
+
 
 =pod
 
@@ -341,6 +420,12 @@ arg is id
 returns hashref
 
 =cut
+=head1 SPEEDING UP QUERIES
+
+Make sure you have an index on the metadata table
+
+   CREATE INDEX id_index ON metadata(id);
+
 
 
 
