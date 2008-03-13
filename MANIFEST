@@ -11,7 +11,7 @@ MANIFEST
 Makefile.PL
 lib/Metadata/DB/Analizer.pm - analize the database content
 lib/Metadata/DB/Search.pm - search the database
-lib/Metadata/DB/Search/InterfaceHTML.pm - generate static html form 
+# lib/Metadata/DB/Search/InterfaceHTML.pm - generate static html form, moved to Metadata::DB::WUI
 lib/Metadata/DB/Base.pm - store metadata record in db base
 lib/Metadata/DB.pm
 

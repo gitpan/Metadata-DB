@@ -24,6 +24,11 @@ my $dbh = _get_new_handle();
 
 my $m = new Metadata::DB({ DBH => $dbh , id => 88 });
 
+my $tmexists = $m->table_metadata_exists;
+
+### $tmexists
+
+
 ok( $m->table_metadata_check );
 
 
@@ -64,7 +69,7 @@ print STDERR "\n$dump\n\n";
 
 # undefine everything, make sure it can still load...
 
-$dbh->disconnect;
+#$dbh->disconnect;
 undef $dbh;
 undef $m;
 

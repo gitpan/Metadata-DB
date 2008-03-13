@@ -1,7 +1,7 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Metadata-DB
-version:      1.09
+version:      1.10
 version_from: lib/Metadata/DB.pm
 installdirs:  site
 requires:

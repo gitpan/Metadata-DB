@@ -1,12 +1,5 @@
 package Metadata::DB::Base;
 use strict;
-#use LEOCHARRE::Class::Accessors single => [qw(
-#table_metadata_name
-#table_metadata_column_name_id
-#table_metadata_column_name_key 
-#table_metadata_column_name_value
-#dbh
-#)];
 use LEOCHARRE::DEBUG;
 use LEOCHARRE::DBI;
 use warnings;
@@ -35,8 +28,10 @@ sub dbh {
 # 1) set defaults on load
 
 sub table_metadata_name {
-   my $self = shift;
+   my ($self, $val) = shift;
+   $self->{table_metadata_name} = $val if defined $val;   
    $self->{table_metadata_name} ||= 'metadata';
+   return $self->{table_metadata_name};
 }
 
 sub table_metadata_column_name_id {
@@ -68,7 +63,8 @@ sub table_metadata_create {
    my $self = shift;
    my $layout = $self->table_metadata_layout;
    debug("creating table:\n$layout\n");
-   $self->dbh->do($layout);
+   $self->dbh->do($layout)
+      or die( $self->dbh->errstr );
    return 1;
 }
 
@@ -91,6 +87,22 @@ sub table_metadata_layout {
    return $current;     
 }
 
+sub table_metadata_drop {
+   my $self = shift;
+   my $table_name = $self->table_metadata_name;
+   $self->dbh->drop_table($table_name)
+      or die($self->dbh->errstr);
+   return 1;
+}
+
+sub table_metadata_reset {
+   my $self = shift;
+     if( $self->table_metadata_exists ){
+      $self->table_metadata_drop;
+   }
+   $self->table_metadata_create;
+   return 1;   
+}
 
 # this is mostly debug
 sub table_metadata_dump {
@@ -138,6 +150,13 @@ sub table_metadata_check {
    $self->table_metadata_exists or $self->table_metadata_create;
    return 1;
 }
+
+
+
+
+
+
+
 
 
 # SINGLE RECORD METHODS, ETC
@@ -331,6 +350,28 @@ sub _table_metadata_insert_multiple {
 }
 
 
+sub create_index_id {
+   my $self = shift;
+   $self->create_index(
+      $self->table_metadata_name, 
+      $self->table_metadata_column_name_id 
+   );
+   debug('created index 1');
+   return 1;
+}
+
+sub create_index {
+   my($self, $tablename, $colname) = @_;
+   
+   defined $colname or die;
+   my $cmd = "CREATE INDEX $colname\_index ON $tablename($colname);";
+   debug($cmd);
+   $self->dbh->do($cmd) or die($self->dbh->errstr);
+   return 1;
+
+}
+
+
 
 
 1;
@@ -355,10 +396,14 @@ This is a database handle you opened before instancing the object
 If you wanted to change the name of the table..
 
    my $m = Metadata::DB::Base({ DBH => $dbh });
-   $m->table_metadata_name_set('other_metadata_table');
+   $m->table_metadata_name('other_metadata_table'); # default is 'metadata'
    $m->table_metadata_check; # make sure the table is there, if you wanted to setup
 
-   
+
+
+
+
+
 
 =head1 SETUP AND DB METHODS
 
@@ -366,6 +411,7 @@ If you wanted to change the name of the table..
 
 returns database handle
 The DBI handle is passed to the CONSTRUCTOR
+You will need LEOCHARRE::Database 
 
 =head2 table_metadata_exists()
 
@@ -392,6 +438,25 @@ If you turn DEBUG to on, this is printed to STDERR .
 
 create table if not exists
 
+=head2 table_metadata_drop()
+
+drops metadata table
+erases all records
+
+=head2 table_metadata_reset()
+
+drops and rebuilds metadata table
+erases all records
+
+=head2 create_index_id()
+
+creates an index for id col
+
+=head2 create_index()
+
+args are table name and column name
+
+
 =head1 RECORD METHODS
 
 =head2 _record_entries_delete()
@@ -411,21 +476,51 @@ arg is id, key, val
 =head2 _table_metadata_insert_multiple()
 
 arg is id and hashref
+the hash ref is the metadata key value pairs
+this is mostly used for indexing
 
-
+   $self->_table_metadata_insert_mutiple(
+      5,
+      {
+         name_first => 'jim',
+         name_middle => 'raynor',
+         name_last => 'waltzman',
+         phone_number => '208-479-1515',
+      },
+   );
 
 =head2 _record_entries_hashref()
 
 arg is id
 returns hashref
 
-=cut
-=head1 SPEEDING UP QUERIES
 
-Make sure you have an index on the metadata table
+=head1 CREATE INDEXES
 
-   CREATE INDEX id_index ON metadata(id);
+This is to VASTLY improve the speeds of searches
 
+use method create_index_id() after running an indexing run for example
 
+=head1 SEE ALSO
 
+Metadata::DB
+Metadata::DB::Indexer
+Metadata::DB::WUI
+Metadata::Base
+LEOCHARRE::Database
+
+=head1 AUTHOR
+
+Leo Charre leocharre at cpan dot org
+
+=head1 CAVEATS
+
+Still in development
+Make sure you have the latest versions of DBI and DBD::mysql
+
+=head1 BUGS
+
+Send to AUTHOR
+
+=ct
 

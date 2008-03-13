@@ -41,30 +41,67 @@ sub search_attributes_selected {
 # if they are more then x choices, then return false
 # what we used this for is making a drop down 
 sub attribute_option_list {
-   my($self,$attribute,$limit) = @_;
-   
+   my( $self, $attribute, $_limit ) = @_;   
    defined $attribute or croak('missing dbh or attribute name');
-   $limit ||= $self->attribute_option_list_limit;
-  
+   
+   # this is safe because it returns what we wet, if we set, otherwise returns anyway
+   my $limit = $self->attribute_option_list_limit( $attribute, $_limit ); 
+   
+   
    # order it 
-   my $list = $self->attribute_all_unique_values($attribute,$limit) or return;
+   my $list = $self->attribute_all_unique_values($attribute,$limit) 
+      or return;
 
    my $sorted = _sort($list);
    
-    # unshift into list a value for 'none' ?
+   # unshift into list a value for 'none' ?
    
    
    return $sorted;
 }
 
-sub attribute_option_list_limit {
-   my $self = shift;
-   unless( $self->attribute_option_list_limit_get ){   
-      $self->attribute_option_list_limit_set(15);
-   }
-   return $self->attribute_option_list_limit_get;
-}
 
+
+sub attribute_option_list_limit {
+   my($self, $att, $limit ) = @_;
+
+   $self->{_attlimit} ||={};
+   $self->{_attlimit_default} ||= 100;
+   
+   if( defined $att and defined $limit){
+      debug("att $att, limit $limit");
+      $self->{_attlimit}->{$att} = $limit;   
+      return $limit;
+   }
+
+   elsif ( defined $att and ( ! defined $limit ) ){ 
+   
+      if( $att=~/^\d+$/ ){ # then this is to set default limit globally
+         debug("setting default limit to $att");
+         $self->{_attlimit_default} = $att;
+         return $self->{_attlimit_default};
+      }
+      
+      else { # we are requesting the limit value for this att
+         
+         
+         my $specific_limit =  $self->{_attlimit}->{$att};
+         unless( $specific_limit ){
+            debug("att $att did not have explicit limit, returning default");
+            return $self->{_attlimit_default}; 
+         }
+         
+         debug("att $att had specific limit set to $specific_limit");
+         return $specific_limit;
+      }
+
+   }
+
+   # no args, just return the default
+   debug("returning default limit of ".$self->{_attlimit_default});
+   
+   return $self->{_attlimit_default};   
+}
 
 
 sub _sort {
@@ -90,14 +127,15 @@ sub _att_uniq_vals {
    my $limit = 1000;
 
    # unique vals
-   my $s = $self->dbh->prepare_cached(
-      sprintf "SELECT DISTINCT %s FROM %s WHERE %s=? LIMIT ?", # this is for heuristics
+
+	my $_sql = sprintf "SELECT DISTINCT %s FROM %s WHERE %s=? LIMIT ?", # this is for heuristics
       $self->table_metadata_column_name_value,
       $self->table_metadata_name,
-      $self->table_metadata_column_name_key
-      );
+      $self->table_metadata_column_name_key;
+
+   my $s = $self->dbh->prepare_cached( $_sql ) or die( "statement [$_sql], ".$self->dbh->errstr );
    
-   $s->execute($att,$limit);
+   $s->execute($att,$limit) or die( $self->dbh->errstr );
    
    my $value;
    $s->bind_columns(\$value);
@@ -271,7 +309,20 @@ sub get_attributes_counts {
 }
 
 
+sub get_records_count {
+   my $self = shift;
 
+   my $idname = $self->table_metadata_column_name_id;
+   my $tablename = $self->table_metadata_name;
+   my $q = $self->dbh->prepare("SELECT count(DISTINCT $idname) FROM $tablename");
+   $q->execute;
+
+   my $count;
+   $q->bind_columns(\$count);
+   $q->fetch;
+   $count ||=0;
+   return $count;
+}
 
 
 
@@ -307,6 +358,18 @@ Consider caching the values with Cache::File
 =head1 DATABASE LAYOUT
 
 Please see Metadata::DB.
+
+
+=head1 RECORD INSPECTION
+
+=head2 get_records_count()
+
+returns count of metadata records (each id is one record).
+
+
+
+
+
 
 
 
@@ -353,7 +416,7 @@ Once you know your attribute label/name.
 =head2 attribute_option_list()
 
 argument is name of attribute, optional arg is a limit number
-the default limit is 15.
+the default limit is 100.
 returns a list suitable for a select box, or returns undef if the unique values
 found for this attribute exceed the limit.
 
@@ -381,17 +444,33 @@ there are..
 
 Remember that the return values depend on what the database table holds!
 
+
+
 =head2 attribute_option_list_limit()
 
-returns defatult limit set. by default this is 15.
+returns defatult limit set. by default this is 100
 if an attribute to be selected from has more then this count, it is offered as a field,
 if it has less, it is a drop down box.
 this can be overridden on a per attribtue basis also, this is just the main default
 
-=head2 attribute_option_list_limit_set()
+you can also set limits on a per attribute basis, to do so..
 
-set the limit for most options avail before we show a text field instead of a drop down
-default is 15
+   my $limit = 
+      $self->attribute_option_list_limt( $attribute_name => $number );
+
+   my $limit_retrieved = 
+      $self->attribute_option_list_limit( $attribute_name );
+
+   my $default_limit_for_all_not_specifically_set =
+      $self->attribute_option_list_limit;
+      
+
+   
+
+this is a perl set get method, always returns the value
+
+
+
 
 =head2 attribute_all_unique_values()
 
@@ -409,12 +488,14 @@ returns boolean
 
 this is useful if you want to offer 'less than' option in a select box, for example
 
+=head2 attribute_type_is_boolean()
+
+TODO: NOT IMPLEMENTED
 
 
 
 
-
-=head1 WHAT SEARCH ATTRIBUTES TO SEARCH BY
+=head1 WHAT SEARCH ATTRIBUTES TO OFFER IN THE SEARCH FORM
 
 When we generate automatic interfaces for searching the metadata.
 
@@ -436,6 +517,26 @@ So, if you wanted to change what shows up..
 
 This means if there are fewer then x 'age' possible values, a dropdown box is generated, etc.
 This is also the order.
+
+
+If you want to grep out all attributes that match 'path'
+
+   my @attribute_names = sort grep { !/path/ } @{ $self->get_search_attributes }; 
+   
+now you need to set them as the atts the user can search by..
+
+   $self->search_attributes_selected_clear;
+   $self->search_attributes_selected_add( @attribute_names );
+
+if you want to set default limits to all atts matching 'client' to be 1000 instead
+of the default limit for all atts
+   
+   for my $att_name ( grep { /client/ } @attribute_names ){
+   
+      $self->attribute_option_list_limit( $att_name => 1000 );
+   
+   }
+
 
 
 =head2 search_attributes_selected_clear()
@@ -464,6 +565,9 @@ arg is attribute name. will take out of list, when generating, will not show up.
 =head1 SEE ALSO
 
 Metadata::DB::Search::InterfaceHTML
+Metadata::DB::WUI
+Metadata::DB
+Metadata::Base
 
 =head1 AUTHOR
 
