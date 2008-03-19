@@ -1,37 +1,20 @@
 package Metadata::DB;
 use strict;
 use LEOCHARRE::DEBUG;
+use LEOCHARRE::Class2;
 use base 'Metadata::Base';
 use base 'Metadata::DB::Base';
 use Carp;
 use vars qw($VERSION);
-$VERSION = sprintf "%d.%02d", q$Revision: 1.10 $ =~ /(\d+)/g;
+$VERSION = sprintf "%d.%02d", q$Revision: 1.11 $ =~ /(\d+)/g;
+
+__PACKAGE__->make_constructor();
+__PACKAGE__->make_accessor_setget({
+   loaded => undef,
+   id => undef,   
+});
 no warnings 'redefine';
 
-sub new {
-   my($class,$self) = @_;
-   $self ||={};
-   bless $self, $class;
-   return $self;
-}
-
-
-sub id {
-   my $self = shift;
-   my $val = shift;
-   if(defined $val){
-      $self->{id} = $val;
-   }   
-   return $self->{id};
-}
-
-sub loaded {
-   my($self,$val) =@_;
-   if (defined $val){
-      $self->{loaded} = $val;
-   }
-   return $self->{loaded};
-}
 
 # overriding  Metadata::Base::Write
 *write = \&save;
@@ -54,6 +37,7 @@ sub id_exists {
 
 sub entries_count {
    my $self = shift;
+   $self->id or warn("no id is set");
    return $self->_record_entries_count($self->id);
 }
 
@@ -130,27 +114,13 @@ sub add {
 
 __END__
 
-
-
-
 =pod
 
 =head1 NAME
 
 Metadata::DB
 
-=head1 DESCRIPTION
-
-This is just like Metadata::Base, only we store in a database.
-An instance of this object represents a metadata record.
-
-=head1 SEE ALSO
-
-Metadata::DB
-
-
 =head1 SYNOPSIS
-
 
    use Metadata::DB;
 
@@ -163,18 +133,11 @@ Metadata::DB
    $o->save;
 
 
-
-   use Metadata::DB;
-
-   my $dbh;
-
-   my $o = new Metadata::DB($dbh);
-   $o->id(4);
-   $o->load;
-   $o->get( 'name' );
-   $o->set( 'age' );
-
-
+   my $o2 = new Metadata::DB($dbh);
+   $o2->id(4);
+   $o2->load;
+   $o2->get( 'name' );
+   $o2->set( 'age' => 44 );
 
 
 =head2 Loading metadata from db
@@ -208,29 +171,37 @@ Inherits Metadata::Base and all its methods.
 
 =head2 new()
 
-argument is hash ref with at least a DBH argument, which is a database handle.
+Argument is hash ref with at least a DBH argument, which is a database handle.
 
-   my $o = new Metadata::DB::Object({ DBH = $dbh });
+   my $o = Metadata::DB->new({ DBH = $dbh });
 
 Optional argument is 'id'.
 
 =head2 id()
 
-perl setget method
-arg is number
+Perl setget method.
+Arg is number.
 
 =head2 id_exists()
 
-returns boolean
-if the id is in the database
+Returns boolean.
+If the id is in the database, that is- if the record by this id has any entries in the 
+metadata table, this returns true.
 
 =head2 entries_count()
 
-returns number of entries for this id
+Returns number of entries for this id.
 
 =head2 set()
 
+Works like Metadata::Base::set()
+
+   $o->set( name => 'Jack' );
+
+
 =head2 elements()
+
+See Metadata::Base.
 
 =head2 add()
 
@@ -244,32 +215,36 @@ Works like set(), only you can provide many entries.
 
 =head2 write(), save()
 
-save to db
+Save to db. You call this to create a new record as well.
+Returns id.
 
 =head2 load(), read()
 
-will attempt to load from db
-YOU MUST CALL load() to check what is in the database
+Will attempt to load from db.
+YOU MUST CALL load() to check what is in the database.
 
 =head2 loaded()
 
-returns boolean
-if load() was triggered or called or not
+Returns boolean
+If load() was triggered or called or not.
 
 =head2 get_all()
 
-returns hashref with all meta
-will attempt to load from db
+Returns hashref with all meta.
+Will attempt to load from db.
 
 =head2 get()
 
+See Metadata::Base.
+
+   $o->get('name');
 
 =head1 CAVEATS
 
 WARNING
 Calling save() before load() will delete all record metadata previously saved.
 
-delete ALL metadata with id 5 and save only 'name marc'.
+Delete ALL metadata with id 5 and save only 'name marc'.
 
    my $m = Metadata::DB->new({ DBH => $dbh, id => 5 });
    $m->set( name=> 'marc' );
@@ -302,9 +277,13 @@ every time, maybe you already know there is nothing in there.
 =head1 SEE ALSO
 
 Metadata::Base
+Metadata::DB::Base
+Metadata::DB::Indexer
+Metadata::DB::Analizer
+Metadata::DB::WUI
 
 =head1 AUTHOR
 
-Leo Charre
+Leo Charre leocharre at cpan dot org
 
 =cut

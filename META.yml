@@ -1,7 +1,7 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Metadata-DB
-version:      1.10
+version:      1.11
 version_from: lib/Metadata/DB.pm
 installdirs:  site
 requires:
@@ -9,7 +9,7 @@ requires:
     File::Copy:                    2
     HTML::Entities:                0
     HTML::Template::Default:       1.04
-    LEOCHARRE::Class:              0
+    LEOCHARRE::Class2:             1.03
     LEOCHARRE::Database:           1
     LEOCHARRE::DEBUG:              0
     Metadata::Base:                0

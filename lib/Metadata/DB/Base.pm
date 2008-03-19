@@ -2,15 +2,18 @@ package Metadata::DB::Base;
 use strict;
 use LEOCHARRE::DEBUG;
 use LEOCHARRE::DBI;
+use LEOCHARRE::Class2;
 use warnings;
 use Carp;
 
-sub new {
-   my($class,$self) = @_;
-   $self||={};
-   bless $self,$class;
-   return $self;
-}
+__PACKAGE__->make_constructor;
+__PACKAGE__->make_accessor_setget({
+   table_metadata_name              => 'metadata',
+   table_metadata_column_name_id    => 'id',
+   table_metadata_column_name_key   => 'mkey',
+   table_metadata_column_name_value => 'mval',
+
+});
 
 
 no warnings 'redefine';
@@ -24,33 +27,6 @@ sub dbh {
    return $self->{DBH};
 }
 
-
-# 1) set defaults on load
-
-sub table_metadata_name {
-   my ($self, $val) = shift;
-   $self->{table_metadata_name} = $val if defined $val;   
-   $self->{table_metadata_name} ||= 'metadata';
-   return $self->{table_metadata_name};
-}
-
-sub table_metadata_column_name_id {
-   my $self = shift;
-   $self->{table_metadata_column_name_id} ||= 'id';
-   return $self->{table_metadata_column_name_id};
-}
-
-sub table_metadata_column_name_key {
-   my $self = shift;
-   $self->{table_metadata_column_name_key} ||= 'mkey';
-   return $self->{table_metadata_column_name_key};
-}
-
-sub table_metadata_column_name_value {
-   my $self = shift;
-   $self->{table_metadata_column_name_value} ||= 'mval';
-   return $self->{table_metadata_column_name_value};
-}
 
 # setup
 
@@ -105,7 +81,7 @@ sub table_metadata_reset {
 }
 
 # this is mostly debug
-sub table_metadata_dump {
+sub table_metadata_dump { # TODO, i think DBI has this now, alias to that method instead
    my $self = shift;
    my $limit = shift; # at most x extries??
    
@@ -196,7 +172,7 @@ sub _record_entries_delete {
 
 
 *{_record_entries_hashref} = \&_record_entries_hashref_3; # THIS IS THE BEST ONE
-
+*{record_entries_hashref}  = \&_record_entries_hashref_3; # DONT CHANGE THIS ONE 
 
 # TODO this needs to be redone to be faster.. somehow
 sub _record_entries_hashref_1 {
@@ -340,7 +316,7 @@ sub _table_metadata_insert_multiple {
          next ATTRIBUTE;
       }
       elsif( ref $_val ){
-         croak('only scalars and array refs supported at this time');
+         confess(__PACKAGE__.' _table_metadata_insert_multiple(), the value you want to insert into the metadata table is not an array or scalar');
       }
       
       debug("$att is scalar");
@@ -368,7 +344,6 @@ sub create_index {
    debug($cmd);
    $self->dbh->do($cmd) or die($self->dbh->errstr);
    return 1;
-
 }
 
 
@@ -409,52 +384,51 @@ If you wanted to change the name of the table..
 
 =head2 dbh()
 
-returns database handle
+Returns database handle
 The DBI handle is passed to the CONSTRUCTOR
-You will need LEOCHARRE::Database 
 
 =head2 table_metadata_exists()
 
-does the metadata table exist or not?
-returns boolean. 
+Does the metadata table exist or not?
+Returns boolean. 
 
 =head2 table_metadata_create()
 
-creates metadata table, does not check for existance
+Creates metadata table, does not check for existance.
 
 =head2 table_metadata_dump()
 
-optional argument is limit
-returns debug string with a pseudo metadata table dump, suitable for printing to STDERR
+Optional argument is limit.
+Returns debug string with a pseudo metadata table dump, suitable for printing to STDERR
 for debug purposes.
 
 =head2 table_metadata_layout()
 
-returns what the metadata table is expected to look according to current params
-could be useful if you're having a hard time with all of this.
+Returns what the metadata table is expected to look according to current params.
+Could be useful if you're having a hard time with all of this.
 If you turn DEBUG to on, this is printed to STDERR .
 
 =head2 table_metadata_check()
 
-create table if not exists
+Create table if not exists.
 
 =head2 table_metadata_drop()
 
-drops metadata table
-erases all records
+Drops metadata table.
+Erases all records.
 
 =head2 table_metadata_reset()
 
-drops and rebuilds metadata table
-erases all records
+Drops and rebuilds metadata table.
+Erases all records.
 
 =head2 create_index_id()
 
-creates an index for id col
+Creates an index for id col.
 
 =head2 create_index()
 
-args are table name and column name
+Args are table name and column name. Mostly meant to be used internal.
 
 
 =head1 RECORD METHODS
@@ -489,7 +463,7 @@ this is mostly used for indexing
       },
    );
 
-=head2 _record_entries_hashref()
+=head2 _record_entries_hashref() and record_entries_hashref()
 
 arg is id
 returns hashref
@@ -497,17 +471,18 @@ returns hashref
 
 =head1 CREATE INDEXES
 
-This is to VASTLY improve the speeds of searches
+This is to VASTLY improve the speeds of searches.
 
-use method create_index_id() after running an indexing run for example
+Call method create_index_id() after running an indexing run for example.
 
 =head1 SEE ALSO
 
 Metadata::DB
 Metadata::DB::Indexer
+Metadata::DB::Search
 Metadata::DB::WUI
 Metadata::Base
-LEOCHARRE::Database
+
 
 =head1 AUTHOR
 

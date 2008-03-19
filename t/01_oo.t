@@ -2,8 +2,8 @@ use Test::Simple 'no_plan';
 use strict;
 use lib './lib';
 use Metadata::DB;
-
 use Cwd;
+
 $Metadata::DB::DEBUG = 1;
 use Smart::Comments '###';
 

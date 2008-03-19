@@ -4,7 +4,7 @@ WriteMakefile(
    VERSION_FROM  => 'lib/Metadata/DB.pm',
    PREREQ_PM => {
       'Metadata::Base' => 0,
-      'LEOCHARRE::Class' => 0,
+      'LEOCHARRE::Class2' => '1.03',
       'LEOCHARRE::Database' => '1',
       'LEOCHARRE::DEBUG' => 0,
       'HTML::Entities' => 0,
