@@ -6,7 +6,7 @@ use base 'Metadata::Base';
 use base 'Metadata::DB::Base';
 use Carp;
 use vars qw($VERSION);
-$VERSION = sprintf "%d.%02d", q$Revision: 1.11 $ =~ /(\d+)/g;
+$VERSION = sprintf "%d.%02d", q$Revision: 1.12 $ =~ /(\d+)/g;
 
 __PACKAGE__->make_constructor();
 __PACKAGE__->make_accessor_setget({
@@ -15,17 +15,16 @@ __PACKAGE__->make_accessor_setget({
 });
 no warnings 'redefine';
 
-
 # overriding  Metadata::Base::Write
 *write = \&save;
 sub save {
    my $self = shift;
-   $self->id or confess('no id is set');
+   my $id = $self->id or confess('no id is set');
 
-   $self->_record_entries_delete( $self->id );
-   $self->_table_metadata_insert_multiple( $self->id, $self->get_all );
+   $self->_record_entries_delete( $id );
+   $self->_table_metadata_insert_multiple( $id, $self->get_all );
    
-   return 1;
+   return $id;
 }
 
 
@@ -37,8 +36,8 @@ sub id_exists {
 
 sub entries_count {
    my $self = shift;
-   $self->id or warn("no id is set");
-   return $self->_record_entries_count($self->id);
+   my $id = $self->id or warn("no id is set");
+   return $self->_record_entries_count($id);
 }
 
 
@@ -78,13 +77,13 @@ sub _get_meta_from_object {
 sub load {
    my $self = shift;
 
-   $self->id or confess('cannot load, no id is set, no id was passed as arg');
+   my $id = $self->id or confess('cannot load, no id is set, no id was passed as arg');
    #debug('calling clear..');
    #$self->clear;
    $self->loaded(1);
 
-   if ( my $meta= $self->_record_entries_hashref($self->id) ){
-      debug("found meta for:".$self->id);
+   if ( my $meta= $self->_record_entries_hashref($id) ){
+      debug("found meta for: $id");
       $self->add(%$meta);
    }
    return 1;
