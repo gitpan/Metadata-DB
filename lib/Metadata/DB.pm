@@ -6,7 +6,7 @@ use base 'Metadata::Base';
 use base 'Metadata::DB::Base';
 use Carp;
 use vars qw($VERSION);
-$VERSION = sprintf "%d.%02d", q$Revision: 1.12 $ =~ /(\d+)/g;
+$VERSION = sprintf "%d.%02d", q$Revision: 1.13 $ =~ /(\d+)/g;
 
 __PACKAGE__->make_constructor();
 __PACKAGE__->make_accessor_setget({
@@ -84,7 +84,7 @@ sub load {
 
    if ( my $meta= $self->_record_entries_hashref($id) ){
       debug("found meta for: $id");
-      $self->add(%$meta);
+      $self->add(%$meta); # what happens if we load twice???
    }
    return 1;
 }
@@ -105,6 +105,22 @@ sub add {
 }
 
 
+
+# lookup
+sub lookup {
+   my $self = shift;
+
+   # are there any atts set??
+   $self->elements or $self->errstr("no elements present, no atts.") and return;
+   
+   my $metaref = $self->get_all;
+   my $found_id = $self->_find_record_id_via_record_entries_hashref($metaref) or return;
+   # load it? i guess yes
+
+   $self->id($found_id);
+   $self->load;
+   $found_id;
+}
 
 
 
@@ -189,14 +205,13 @@ metadata table, this returns true.
 
 =head2 entries_count()
 
-Returns number of entries for this id.
+Returns number of entries for this record.
 
 =head2 set()
 
 Works like Metadata::Base::set()
 
    $o->set( name => 'Jack' );
-
 
 =head2 elements()
 
@@ -221,16 +236,56 @@ Returns id.
 
 Will attempt to load from db.
 YOU MUST CALL load() to check what is in the database.
+If load is not called or triggered, the data in the object is just the data in the object.
+Instead of a representation of what is or may be stored.
 
 =head2 loaded()
 
 Returns boolean
 If load() was triggered or called or not.
 
+=head2 lookup()
+
+Takes no argument.
+Returns record id.
+On fail returns undef, reason for failure is in errstr().
+
+This is another kind of load() method.
+(Internally it's also a kind of very specific search.)
+It requires that first you have some attribute set() in the instance.
+It will look up the records by those attributes, if one and one only matches those 
+attributes exactly, then the record's id() is automatically set and load() is called.
+
+For example, if you have a "person" record. That you know contains an attribute called 
+"last_name" with value "Jefferson"- If there is only one record matching that, you can 
+load the metadata record via the last name.
+
+   my $m = Metadata::DB->new({ DBH => $dbh });
+   $m->set( last_name => 'Jefferson' ); # has not yet been loaded
+   $m->lookup or print ("was not found because :".$m->errstr ) and exit;
+
+   # now you can access all the record's metadata which has been loaded..
+   my $record_id = $m->id;
+   my $last_name = $m->get('last_name');
+   my $first_name = $m->get('first_name');
+   # etc..
+
+Note that if you had had two records with last name 'Jefferson', lookup() would fail,
+and errstr() would contain a message saying that too many records matched.
+
 =head2 get_all()
 
 Returns hashref with all meta.
-Will attempt to load from db.
+This only returns what is stored in the object.
+Thus..
+
+   my $m = Metadata::DB->new({ DBH => $dbh });
+   $m->id( 3 );
+   $m->set( name => 'billy');
+
+   $m->get_all; # returns { name => 'billy' }
+
+If you want to get everything that may be in the database, call load() or lookup().
 
 =head2 get()
 
@@ -281,8 +336,32 @@ Metadata::DB::Indexer
 Metadata::DB::Analizer
 Metadata::DB::WUI
 
+=head1 BUGS
+
+Please contact the AUTHOR for any issues, suggestions, bugs etc.
+
 =head1 AUTHOR
 
 Leo Charre leocharre at cpan dot org
+
+=head1 COPYRIGHT
+
+Copyright (c) Leo Charre. All rights reserved.
+
+=head1 LICENSE
+
+This program is free software; you can redistribute it and/or modify it under the same terms and conditions as Perl itself.
+
+This means that you can, at your option, redistribute it and/or modify it under either the terms the GNU Public License (GPL) version 1 or later, or under the Perl Artistic License.
+
+See http://dev.perl.org/licenses/
+
+=head1 DISCLAIMER
+
+THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+Use of this software in any way or in any form, source or binary, is not allowed in any country which prohibits disclaimers of any implied warranties of merchantability or fitness for a particular purpose or any disclaimers of a similar nature.
+
+IN NO EVENT SHALL I BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION (INCLUDING, BUT NOT LIMITED TO, LOST PROFITS) EVEN IF I HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 
 =cut
