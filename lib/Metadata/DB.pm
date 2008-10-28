@@ -6,7 +6,7 @@ use base 'Metadata::Base';
 use base 'Metadata::DB::Base';
 use Carp;
 use vars qw($VERSION);
-$VERSION = sprintf "%d.%02d", q$Revision: 1.13 $ =~ /(\d+)/g;
+$VERSION = sprintf "%d.%02d", q$Revision: 1.15 $ =~ /(\d+)/g;
 
 __PACKAGE__->make_constructor();
 __PACKAGE__->make_accessor_setget({
@@ -19,7 +19,15 @@ no warnings 'redefine';
 *write = \&save;
 sub save {
    my $self = shift;
-   my $id = $self->id or confess('no id is set');
+   #my $id = $self->id or confess('no id is set');
+   my $id;
+   unless( $id = $self->id ){
+      # gen new
+      
+      $id = $self->table_metadata_last_record_id + 1; #thus would set to 1 in none yet
+      $self->id($id);
+   }
+
 
    $self->_record_entries_delete( $id );
    $self->_table_metadata_insert_multiple( $id, $self->get_all );
@@ -29,10 +37,9 @@ sub save {
 
 
 #does obj id exist in db
-sub id_exists {
-   my $self = shift;
-   return $self->entries_count;
-}
+# if id_exists just returns entries_count, might as well be an alias
+#sub id_exists { $_[0]->entries_count }
+*id_exists = \&entries_count;
 
 sub entries_count {
    my $self = shift;
@@ -111,7 +118,7 @@ sub lookup {
    my $self = shift;
 
    # are there any atts set??
-   $self->elements or $self->errstr("no elements present, no atts.") and return;
+   $self->elements or $self->errstr("No elements present, no atts.") and return;
    
    my $metaref = $self->get_all;
    my $found_id = $self->_find_record_id_via_record_entries_hashref($metaref) or return;
@@ -121,6 +128,8 @@ sub lookup {
    $self->load;
    $found_id;
 }
+
+
 
 
 
@@ -225,7 +234,6 @@ Works like set(), only you can provide many entries.
       name => 'this',
       age => 4,
    );
-
 
 =head2 write(), save()
 

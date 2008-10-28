@@ -58,6 +58,7 @@ sub table_metadata_layout {
      $self->table_metadata_column_name_key,
      $self->table_metadata_column_name_value     
      ;
+   # this is a strange and interesting layout
    return $current;     
 }
 
@@ -119,16 +120,7 @@ sub table_metadata_dump { # TODO, i think DBI has this now, alias to that method
   # return $string;
 }
 
-sub table_metadata_check {
-   my $self = shift;
-   $self->table_metadata_exists or $self->table_metadata_create;
-   return 1;
-}
-
-
-
-
-
+sub table_metadata_check { $_[0]->table_metadata_exists or $_[0]->table_metadata_create; 1 }
 
 
 
@@ -422,7 +414,15 @@ sub create_index {
    return 1;
 }
 
+sub table_metadata_last_record_id {
+   my $self = shift;
+   my ( $col_id, $table_name) = ( $self->table_metadata_column_name_id, $self->table_metadata_name );
 
+   my $sql = "SELECT $col_id FROM $table_name ORDER BY $col_id DESC LIMIT 1";
+   my $aref = $self->dbh->selectall_arrayref($sql) or croak("Could not '$sql', ".$self->dbh->errstr);
+   $aref and scalar @$aref or $self->errstr("Didn't find anything, no records?") and return;
+   $aref->[0]->[0];
+}
 
 
 1;
@@ -509,6 +509,11 @@ Creates an index for id col.
 
 Args are table name and column name. Mostly meant to be used internal.
 
+=head2 table_metadata_last_record_id()
+
+Returns the highest record id number in the table.
+If none, returns undef- check errstr().
+This is similar to a last_insert_id procedure, but checks the id.
 
 =head1 RECORD METHODS
 
